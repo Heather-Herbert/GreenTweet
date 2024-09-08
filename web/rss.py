@@ -1,0 +1,69 @@
+import logging
+import datetime
+import feedparser
+from bs4 import BeautifulSoup
+import requests
+
+
+class RSSClass:
+    def get_most_popular_story(rss_url):
+        # Set application up
+        logname = datetime.today().strftime('%Y-%m-%d')
+        logging.basicConfig(filename=f'rss/main-{logname}.log', level=logging.INFO)
+        # Fetch the RSS feed
+        feed = feedparser.parse(rss_url)
+
+        # Assume the first entry is the most popular story
+        if feed.entries:
+            return feed.entries[0].link  # return the link of the most popular story
+        else:
+            currenttime = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+            logging.error(f'{currenttime}- No entries found in the RSS feed {rss_url}.')
+            raise Exception("No entries found in the RSS feed.")
+
+    def get_article_text(article_url):
+        # Fetch the webpage
+        response = requests.get(url)
+        if response.status_code == 200:
+            # Parse the webpage content
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Extract the main article text (simplified example)
+            paragraphs = soup.find_all('p')
+            article_text = ' '.join([p.get_text() for p in paragraphs])
+
+            return article_text
+        else:
+            logname = datetime.today().strftime('%Y-%m-%d')
+            logging.basicConfig(filename=f'rss/main-{logname}.log', level=logging.INFO)
+            currenttime = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+            logging.error(f'{currenttime}- No entries found in the RSS feed {rss_url}.')
+            raise Exception(f"Failed to retrieve the page: {response.status_code}")
+
+    def get_article_image(article_url):
+        response = requests.get(article_url)
+
+        if response.status_code == 200:
+            # Parse the webpage content with BeautifulSoup
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Try to find the og:image meta tag
+            og_image = soup.find('meta', property='og:image')
+            if og_image and og_image.get('content'):
+                return og_image['content']
+
+            # If no og:image, try to find the twitter:image meta tag
+            twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
+            if twitter_image and twitter_image.get('content'):
+                return twitter_image['content']
+
+            # Extract images (we'll just take the first one as an example)
+            images = soup.find_all('img')
+            image_urls = [img['src'] for img in images if img.get('src')]
+            if image_urls:
+                return image_urls[0]
+
+            # If no image is found
+            return None
+        else:
+            raise Exception(f"Failed to retrieve the page: {response.status_code}")
