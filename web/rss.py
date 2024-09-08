@@ -9,7 +9,7 @@ class RSSClass:
 
     def __init__(self):
         self.logname = datetime.today().strftime('%Y-%m-%d')
-        logging.basicConfig(filename=f'rss/main-{self.logname}.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+        logging.basicConfig(filename=f'log/rss-{self.logname}.log', level=logging.INFO, format='%(asctime)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
     def get_most_popular_story(self, rss_url):
