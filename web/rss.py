@@ -6,10 +6,15 @@ import requests
 
 
 class RSSClass:
-    def get_most_popular_story(rss_url):
+
+    def __init__(self):
+        self.logname = datetime.today().strftime('%Y-%m-%d')
+        logging.basicConfig(filename=f'rss/main-{self.logname}.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+        self.logger = logging.getLogger(__name__)
+
+    def get_most_popular_story(self, rss_url):
         # Set application up
-        logname = datetime.today().strftime('%Y-%m-%d')
-        logging.basicConfig(filename=f'rss/main-{logname}.log', level=logging.INFO)
+
         # Fetch the RSS feed
         feed = feedparser.parse(rss_url)
 
@@ -17,13 +22,12 @@ class RSSClass:
         if feed.entries:
             return feed.entries[0].link  # return the link of the most popular story
         else:
-            currenttime = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-            logging.error(f'{currenttime}- No entries found in the RSS feed {rss_url}.')
+            self.logger.error(f'No entries found in the RSS feed {rss_url}.')
             raise Exception("No entries found in the RSS feed.")
 
-    def get_article_text(article_url):
+    def get_article_text(self, article_url):
         # Fetch the webpage
-        response = requests.get(url)
+        response = requests.get(article_url)
         if response.status_code == 200:
             # Parse the webpage content
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -34,13 +38,10 @@ class RSSClass:
 
             return article_text
         else:
-            logname = datetime.today().strftime('%Y-%m-%d')
-            logging.basicConfig(filename=f'rss/main-{logname}.log', level=logging.INFO)
-            currenttime = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-            logging.error(f'{currenttime}- No entries found in the RSS feed {rss_url}.')
+            self.logger.error(f'No entries found in the RSS feed {article_url}.')
             raise Exception(f"Failed to retrieve the page: {response.status_code}")
 
-    def get_article_image(article_url):
+    def get_article_image(self, article_url):
         response = requests.get(article_url)
 
         if response.status_code == 200:
@@ -64,6 +65,8 @@ class RSSClass:
                 return image_urls[0]
 
             # If no image is found
+            self.logger.info('No images found in.')
             return None
         else:
+            self.logger.error('error grabbing web page')
             raise Exception(f"Failed to retrieve the page: {response.status_code}")
