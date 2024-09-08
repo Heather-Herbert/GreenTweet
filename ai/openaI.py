@@ -3,7 +3,6 @@ import datetime
 from venv import logger
 
 import requests
-import json
 import os
 from dotenv import load_dotenv
 
