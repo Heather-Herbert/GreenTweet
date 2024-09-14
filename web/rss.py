@@ -1,15 +1,25 @@
 import logging
-import datetime
+from datetime import datetime
+import os
+
 import feedparser
 from bs4 import BeautifulSoup
 import requests
-
+import unicodedata
+import re
 
 class RSSClass:
 
     def __init__(self):
-        self.logname = datetime.today().strftime('%Y-%m-%d')
-        logging.basicConfig(filename=f'log/rss-{self.logname}.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+        log_dir = 'log'
+        logname = datetime.today().strftime('%Y-%m-%d')
+        log_file = f'{log_dir}/rss-{logname}.log'
+
+        # Create the directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Setup logging
+        logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
     def get_most_popular_story(self, rss_url):
@@ -35,6 +45,12 @@ class RSSClass:
             # Extract the main article text (simplified example)
             paragraphs = soup.find_all('p')
             article_text = ' '.join([p.get_text() for p in paragraphs])
+
+            # Normalize the text (remove special characters and normalize unicode)
+            article_text = unicodedata.normalize('NFKD', article_text)
+
+            # Remove non-ASCII characters (optional, depends on your need)
+            article_text = re.sub(r'[^\x00-\x7F]+', '', article_text)
 
             return article_text
         else:

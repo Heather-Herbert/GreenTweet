@@ -1,5 +1,6 @@
+import json
 import logging
-import datetime
+from datetime import datetime
 from venv import logger
 
 import requests
@@ -8,9 +9,15 @@ from dotenv import load_dotenv
 
 class OpenaiClass:
     def __init__(self):
-        self.logname = datetime.today().strftime('%Y-%m-%d')
-        logging.basicConfig(filename=f'log/OpenAI-{self.logname}.log', level=logging.INFO,
-                            format='%(asctime)s - %(message)s')
+        log_dir = 'log'
+        logname = datetime.today().strftime('%Y-%m-%d')
+        log_file = f'{log_dir}/OpenAI-{logname}.log'
+
+        # Create the directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Setup logging
+        logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         # Load the .env file
         load_dotenv()
@@ -43,16 +50,18 @@ class OpenaiClass:
             "Authorization": f"Bearer {APITolken}",
             "Content-Type": "application/json"
         }
-
+        json_data = json.dumps(payload)
         # Make API request to ChatGPT
-        response = requests.request("GET", url, headers=headers, data=payload)
+        response = requests.request("POST", url, headers=headers, data=json_data)
 
         # Extract processed text from response
+
         try:
             processed_text = response.json()['choices'][0]['message']['content']
         except Exception as e:
             logger.error("Error returned data from OpenAI")
-            logger.error(response)
+            logger.error(response.json())
+            logger.error(e)
             raise Exception(f"Error returned data from OpenAI")
 
         return processed_text

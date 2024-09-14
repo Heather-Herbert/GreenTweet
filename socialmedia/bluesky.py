@@ -1,81 +1,129 @@
 import logging
-import datetime
+from datetime import datetime
 import mimetypes
 from venv import logger
 import requests
 import json
 import os
 from dotenv import load_dotenv
+from markdown_it.rules_inline import image
 
 
 class BlueskyClass:
     def __init__(self):
-        self.logname = datetime.today().strftime('%Y-%m-%d')
-        logging.basicConfig(filename=f'log/BlueSky-{self.logname}.log', level=logging.INFO,
-                            format='%(asctime)s - %(message)s')
+        log_dir = 'log'
+        logname = datetime.today().strftime('%Y-%m-%d')
+        log_file = f'{log_dir}/BlueSky-{logname}.log'
+
+        # Create the directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Setup logging
+        logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         # Load the .env file
         load_dotenv()
 
-    def upload_image(self, image):
+    def upload_image(self, image, imageFileName):
         # Guess the MIME type based on the file extension
-        mime_type, _ = mimetypes.guess_type(image)
+        self.mime_type, _ = mimetypes.guess_type(imageFileName)
 
         # If the MIME type is unknown, you can default to 'application/octet-stream'
-        if mime_type is None:
-            mime_type = 'application/octet-stream'
+        if self.mime_type is None:
+            self.mime_type = 'application/octet-stream'
 
-        # Read the file data
-        with open(image, 'rb') as file:
-            payload = file.read()
+        self.logger.info('Uploading image')
 
         # Define the URL and headers
         url = "https://bsky.social/xrpc/com.atproto.repo.uploadBlob"
         headers = {
             'Accept-Encoding': 'application/json; charset=utf-8',
-            'Content-Type': mime_type,  # Set the guessed MIME type
-            'Authorization': self.accessJwt,
+            'Content-Type': self.mime_type,  # Set the guessed MIME type
+            'Authorization': f'Bearer {self.accessJwt}'
         }
 
         # Send the POST request
-        response = requests.post(url, headers=headers, data=payload)
+        response = requests.post(url, headers=headers, data=image)
 
-        self.image = ''
+        self.size = 0
+        try:
+            # Extract the '$link' value
+            link = response.json()['blob']['ref']['$link']
+            self.size = response.json()['blob']['size']
+            return link
+        except KeyError as e:
+            print(f"KeyError: Missing key in response JSON - {e}")
+            return None
 
-    def send_message(self, text, url, image, alttext):
-
+    def send_message(self, text, url, image=None, alttext=''):
+        # Generate the current time in the required format
         current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
-        post_content = {
-            "text": f"{text} {url}",  # Combine text and URL in the post body
-            "createdAt": current_time  # Replace with current time
+        # Create the record content
+        record_content = {
+            "$type": "app.bsky.feed.post",
+            "text": f"{text} {url}",
+            "createdAt": current_time
         }
 
-        # If there's an image, add the image reference to the post content
         if image:
-            post_content["embed"] = {
+            record_content["embed"] = {
+                "$type": "app.bsky.embed.images",  # Include the $type property
                 "images": [
                     {
-                        "image": self.image,  # Image blob reference
-                        "alt": alttext  # Alternative text for accessibility
+                        "alt": alttext,
+                        "image": {
+                            "$type": "blob",
+                            "ref": {
+                                "$link": image
+                            },
+                            "mimeType": self.mime_type,
+                            "size": self.size
+                        },
                     }
                 ]
             }
 
-
-        payload = json.dumps({
-            "repo": f"{self.did}",
-            "collection": "app.bsky.feed.post",
-            "record": {
-                "$type": "app.bsky.feed.post",
-                "record": post_content
+        record_content["facets"] = [
+            {
+                "index": {
+                    "byteStart": len(text) + 1,
+                    "byteEnd": len(text) + 1 + len(url)
+                },
+                "features": [
+                    {
+                    "$type": "app.bsky.richtext.facet#link",
+                    "uri": url
+                    }
+                ]
             }
-        })
+        ]
+
+        # Prepare the payload
+        payload = {
+            "repo": self.did,
+            "collection": "app.bsky.feed.post",
+            "record": record_content
+        }
+
+        # Set up headers
+        headers = {
+            "Accept-Encoding": "application/json; charset=utf-8",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.accessJwt}"  # Use f-string for correct variable interpolation
+        }
+
+        # Get the host from environment variables
+        host = os.getenv('BLUESKY_HOST')
+        target_url = f"{host}com.atproto.repo.createRecord"  # Ensure the URL is correct
+
+        # Send the request
+        response = requests.post(target_url, headers=headers,
+                                 json=payload)  # Use `json=payload` to handle JSON encoding
 
 
-        pass
 
-    def login(self, username, password):
+    def login(self):
 
         host     = os.getenv('BLUESKY_HOST')
         handle   = os.getenv('BLUESKY_HANDLE')
