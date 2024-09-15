@@ -83,12 +83,13 @@ class BlueskyClass:
                     }
                 ]
             }
-
+        text_bytes = text.encode('utf-8')
+        text_length = len(text_bytes)
         record_content["facets"] = [
             {
                 "index": {
-                    "byteStart": len(text) + 1,
-                    "byteEnd": len(text) + 1 + len(url)
+                    "byteStart": text_length + 1,
+                    "byteEnd": text_length + 1 + len(url)
                 },
                 "features": [
                     {
