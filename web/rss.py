@@ -22,18 +22,34 @@ class RSSClass:
         logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
-    def get_most_popular_story(self, rss_url):
-        # Set application up
-
+    def get_most_popular_story(self, rss_url, processed_urls_file='processed_urls.txt'):
         # Fetch the RSS feed
         feed = feedparser.parse(rss_url)
 
-        # Assume the first entry is the most popular story
-        if feed.entries:
-            return feed.entries[0].link  # return the link of the most popular story
-        else:
-            self.logger.error(f'No entries found in the RSS feed {rss_url}.')
-            raise Exception("No entries found in the RSS feed.")
+        # Ensure the processed URLs file exists
+        if not os.path.exists(processed_urls_file):
+            with open(processed_urls_file, 'w') as f:
+                pass  # Create the file if it doesn't exist
+
+        # Load already processed URLs
+        with open(processed_urls_file, 'r') as f:
+            processed_urls = f.read().splitlines()
+
+        # Iterate through feed entries to find a new URL
+        for entry in feed.entries:
+            story_url = entry.link
+
+            # If the URL is not in the processed URLs list, save it and return it
+            if story_url not in processed_urls:
+                # Save the new URL to the processed file
+                with open(processed_urls_file, 'a') as f:
+                    f.write(story_url + '\n')
+
+                return story_url
+
+        # If no new story found, log the error and raise an exception
+        self.logger.error(f'No new entries found in the RSS feed {rss_url}.')
+        raise Exception("No new entries found in the RSS feed.")
 
     def get_article_text(self, article_url):
         # Fetch the webpage
