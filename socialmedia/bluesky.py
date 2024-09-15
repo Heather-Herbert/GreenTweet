@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 import mimetypes
 from venv import logger
@@ -66,9 +67,38 @@ class BlueskyClass:
             "createdAt": current_time
         }
 
+        # Prepare the facets list
+        facets = []
+
+        # Convert text to bytes (UTF-8 encoding) for accurate byte indexing
+        text_bytes = text.encode('utf-8')
+
+        # Helper function to convert character index to byte index
+        def char_to_byte_index(char_index):
+            return len(text[:char_index].encode('utf-8'))
+
+        # Find and handle hashtags with correct byte positions for UTF-8
+        hashtags = [(m.start(), m.end(), m.group()[1:]) for m in re.finditer(r'#\w+', text)]
+        for start, end, tag in hashtags:
+            byte_start = char_to_byte_index(start)
+            byte_end = char_to_byte_index(end)
+            facets.append({
+                "index": {
+                    "byteStart": byte_start,
+                    "byteEnd": byte_end
+                },
+                "features": [
+                    {
+                        "$type": "app.bsky.richtext.facet#tag",
+                        "tag": tag
+                    }
+                ]
+            })
+
+        # Handle embedded images
         if image:
             record_content["embed"] = {
-                "$type": "app.bsky.embed.images",  # Include the $type property
+                "$type": "app.bsky.embed.images",
                 "images": [
                     {
                         "alt": alttext,
@@ -83,22 +113,25 @@ class BlueskyClass:
                     }
                 ]
             }
-        text_bytes = text.encode('utf-8')
-        text_length = len(text_bytes)
-        record_content["facets"] = [
-            {
-                "index": {
-                    "byteStart": text_length + 1,
-                    "byteEnd": text_length + 1 + len(url)
-                },
-                "features": [
-                    {
+
+        # Handle the link as a facet with correct byte indexing
+        url_start_byte = len(text_bytes) + 1  # After the text
+        facets.append({
+            "index": {
+                "byteStart": url_start_byte,
+                "byteEnd": url_start_byte + len(url.encode('utf-8'))
+            },
+            "features": [
+                {
                     "$type": "app.bsky.richtext.facet#link",
                     "uri": url
-                    }
-                ]
-            }
-        ]
+                }
+            ]
+        })
+
+        # Add facets to the record content if any
+        if facets:
+            record_content["facets"] = facets
 
         # Prepare the payload
         payload = {
@@ -111,18 +144,17 @@ class BlueskyClass:
         headers = {
             "Accept-Encoding": "application/json; charset=utf-8",
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.accessJwt}"  # Use f-string for correct variable interpolation
+            "Authorization": f"Bearer {self.accessJwt}"
         }
 
         # Get the host from environment variables
         host = os.getenv('BLUESKY_HOST')
-        target_url = f"{host}com.atproto.repo.createRecord"  # Ensure the URL is correct
+        target_url = f"{host}com.atproto.repo.createRecord"
 
         # Send the request
-        response = requests.post(target_url, headers=headers,
-                                 json=payload)  # Use `json=payload` to handle JSON encoding
+        response = requests.post(target_url, headers=headers, json=payload)
 
-
+        return response
 
     def login(self):
 

@@ -1,14 +1,10 @@
 import requests
 
-import socialmedia
-import ai
 from ai.openaI import OpenaiClass
 from socialmedia.bluesky import BlueskyClass
 from web.rss import RSSClass
 
 import os
-from dotenv import load_dotenv
-
 import logging
 from datetime import datetime
 
